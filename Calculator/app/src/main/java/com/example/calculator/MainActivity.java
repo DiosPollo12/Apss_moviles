@@ -7,9 +7,8 @@ import android.widget.EditText;
 import android.widget.RadioButton;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import androidx.room.Room;
 import androidx.appcompat.app.AppCompatActivity;
-
 import java.text.DecimalFormat;
 
 public class MainActivity extends AppCompatActivity {
@@ -22,15 +21,24 @@ public class MainActivity extends AppCompatActivity {
     private EditText metrosText;
     private EditText cmText;
     private EditText pesoText;
+    private TextView userTextView;
+    private AppDatabase db;
+    private UserDao userDao;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Toast.makeText(this, "Bienvenido", Toast.LENGTH_LONG).show();
+        db = Room.databaseBuilder(getApplicationContext(),
+                        AppDatabase.class, "database-name")
+                .allowMainThreadQueries() // Permite operaciones en el hilo principal (solo para pruebas)
+                .build();
+
+        userDao = db.userDao();
 
         findViews();
+        insertUserIfNotExists();
         setupButtonClickListener();
     }
 
@@ -70,27 +78,47 @@ public class MainActivity extends AppCompatActivity {
 
             double imc = pesoKg / (alturaMetros * alturaMetros);
 
+            // Mostrar usuario guardado
+            User savedUser = userDao.getFirstUser();
+            if (savedUser != null) {
+                userTextView.setText("Hola, " + savedUser.name + " tu IMC es: " + new DecimalFormat("0.00").format(imc) + "\n" );
+            }
+
             // Si la edad es menor a 16 años, mostrar la advertencia correspondiente
             if (edad < 16) {
                 String advertencia = mujerButton.isChecked() ?
                         "Para una interpretación correcta consulta los percentiles de talla y peso para niñas." :
                         "Para una interpretación correcta consulta los percentiles de talla y peso para niños.";
 
-                resultTxt.setText("Tu IMC es: " + new DecimalFormat("0.00").format(imc) + "\n" + advertencia);
+                resultTxt.setText("Hola, " + savedUser.name + " tu IMC es: " + new DecimalFormat("0.00").format(imc) + "\n" + advertencia);
                 return;
             }
 
             // Mostrar resultado normal para mayores de 16 años
-            displayResult(imc);
+
 
         } catch (NumberFormatException e) {
             resultTxt.setText("Error: Ingresa valores numéricos válidos.");
         }
     }
 
-    private void displayResult(double imc) {
+    private void displayResult(double imc, int edad) {
         DecimalFormat df = new DecimalFormat("0.00");
         String result = "Tu IMC es: " + df.format(imc) + "\n";
+        User savedUser = userDao.getFirstUser();
+        if (savedUser != null) {
+            userTextView.setText("Hola, " + savedUser.name + " tu IMC es: " + new DecimalFormat("0.00").format(imc) + "\n" );
+        }
+
+        // Si la edad es menor a 16 años, mostrar la advertencia correspondiente
+        if (edad < 16) {
+            String advertencia = mujerButton.isChecked() ?
+                    "Para una interpretación correcta consulta los percentiles de talla y peso para niñas." :
+                    "Para una interpretación correcta consulta los percentiles de talla y peso para niños.";
+
+            resultTxt.setText("Hola, " + savedUser.name + " tu IMC es: " + new DecimalFormat("0.00").format(imc) + "\n" + advertencia);
+            return;
+        }
 
         String categoria;
         if (imc < 18.5)
@@ -114,5 +142,13 @@ public class MainActivity extends AppCompatActivity {
         cmText = findViewById(R.id.edit_text_cm);
         pesoText = findViewById(R.id.edit_text_peso);
         calcButton = findViewById(R.id.button_calcular);
+        userTextView = findViewById(R.id.userTextView);
+    }
+
+    private void insertUserIfNotExists() {
+        if (userDao.getFirstUser() == null) {
+            User user = new User("Francisco Vargas");
+            userDao.insert(user);
+        }
     }
 }
